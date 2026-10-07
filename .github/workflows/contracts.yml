@@ -1,0 +1,13 @@
+name: Contract tests
+on:
+  push:
+    paths: ["contracts/**", ".github/workflows/contracts.yml"]
+  pull_request:
+    paths: ["contracts/**"]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+      - run: forge test --root contracts -vvv
