@@ -22,49 +22,71 @@ jobs:
           BOTCHAIN_RPC_URL: https://rpc.botchain.ai
         shell: bash
         run: |
-          set -euo pipefail
-          test -n "$PRIVATE_KEY" || { echo "PRIVATE_KEY secret is missing."; exit 1; }
+          set -Eeuo pipefail
+          PHASE="initial checks"
+          trap 'echo "::error::Interaction workflow failed during: $PHASE"' ERR
+          test -n "$PRIVATE_KEY" || { echo "::error::PRIVATE_KEY secret is missing."; exit 1; }
           [[ "$PRIVATE_KEY" == 0x* ]] || PRIVATE_KEY="0x$PRIVATE_KEY"
           echo "::add-mask::$PRIVATE_KEY"
           CHAIN_ID=$(cast chain-id --rpc-url "$BOTCHAIN_RPC_URL")
-          test "$CHAIN_ID" = "677" || { echo "RPC returned chain ID $CHAIN_ID; expected 677."; exit 1; }
+          test "$CHAIN_ID" = "677" || { echo "::error::RPC returned chain ID $CHAIN_ID; expected 677."; exit 1; }
           CONTRACT=$(sed -n 's/.*QUESTFORGE_MAINNET_ADDRESS = "\(0x[a-fA-F0-9]\{40\}\)".*/\1/p' lib/deployment.ts)
-          test -n "$CONTRACT" || { echo "Run the mainnet deployment workflow first."; exit 1; }
+          test -n "$CONTRACT" || { echo "::error::Run the mainnet deployment workflow first."; exit 1; }
           CODE=$(cast code "$CONTRACT" --rpc-url "$BOTCHAIN_RPC_URL")
-          test "$CODE" != "0x" || { echo "No contract exists at $CONTRACT."; exit 1; }
-          DEADLINE=$(($(date +%s) + 604800))
-          cast send "$CONTRACT" 'createQuest(string,string,string,uint64,uint96,uint32)' Q Q Q "$DEADLINE" 1 6 \
-            --value 6wei --private-key "$PRIVATE_KEY" --rpc-url "$BOTCHAIN_RPC_URL" >/dev/null
-          QUEST_ID=$(cast call "$CONTRACT" 'questCount()(uint256)' --rpc-url "$BOTCHAIN_RPC_URL")
+          test "$CODE" != "0x" || { echo "::error::No contract exists at $CONTRACT."; exit 1; }
+          FUNDER=$(cast wallet address --private-key "$PRIVATE_KEY")
           GAS_PRICE=$(cast gas-price --rpc-url "$BOTCHAIN_RPC_URL")
-          GAS_LIMIT=$(cast estimate "$CONTRACT" 'submitProof(uint256,string)' "$QUEST_ID" x \
-            --from "$(cast wallet address --private-key "$PRIVATE_KEY")" --rpc-url "$BOTCHAIN_RPC_URL")
-          FUNDING=$((GAS_LIMIT * GAS_PRICE * 120 / 100))
+          SUBMIT_GAS_LIMIT=180000
+          FUNDING=$((SUBMIT_GAS_LIMIT * GAS_PRICE))
+          echo "Contract: $CONTRACT"
+          echo "Funder: $FUNDER"
+          echo "Gas price: $GAS_PRICE wei"
+          echo "Funding each temporary wallet with $FUNDING wei; unused gas remains in that wallet."
+
+          PHASE="creating the minimal six-slot quest"
+          DEADLINE=$(($(date +%s) + 604800))
+          CREATE_JSON=$(cast send "$CONTRACT" 'createQuest(string,string,string,uint64,uint96,uint32)' Q Q Q "$DEADLINE" 1 6 \
+            --value 6wei --private-key "$PRIVATE_KEY" --rpc-url "$BOTCHAIN_RPC_URL" --json)
+          CREATE_TX=$(jq -r '.transactionHash // .transaction_hash // empty' <<<"$CREATE_JSON")
+          test -n "$CREATE_TX" || { echo "::error::The quest transaction returned no transaction hash."; exit 1; }
+          QUEST_ID=$(cast call "$CONTRACT" 'questCount()(uint256)' --rpc-url "$BOTCHAIN_RPC_URL")
+          echo "Quest $QUEST_ID created: https://scan.botchain.ai/tx/$CREATE_TX"
+
           : > wallet-addresses.txt
           echo "### Six BOT Chain Mainnet wallet interactions" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "| # | Wallet | Proof transaction |" >> "$GITHUB_STEP_SUMMARY"
-          echo "|---:|---|---|" >> "$GITHUB_STEP_SUMMARY"
-          for INDEX in 1 2 3 4 5 6; do
-            WALLET_JSON=$(cast wallet new --json)
-            ADDRESS=$(jq -r 'if type == "array" then .[0] else . end | .address' <<<"$WALLET_JSON")
-            WALLET_KEY=$(jq -r 'if type == "array" then .[0] else . end | .private_key // .privateKey' <<<"$WALLET_JSON")
-            test -n "$ADDRESS" && test "$ADDRESS" != "null"
-            test -n "$WALLET_KEY" && test "$WALLET_KEY" != "null"
-            echo "::add-mask::$WALLET_KEY"
-            cast send "$ADDRESS" --value "${FUNDING}wei" --private-key "$PRIVATE_KEY" --rpc-url "$BOTCHAIN_RPC_URL" >/dev/null
-            TX_JSON=$(cast send "$CONTRACT" 'submitProof(uint256,string)' "$QUEST_ID" "$INDEX" --private-key "$WALLET_KEY" --rpc-url "$BOTCHAIN_RPC_URL" --json)
-            TX_HASH=$(jq -r '.transactionHash // .transaction_hash' <<<"$TX_JSON")
-            test -n "$TX_HASH" && test "$TX_HASH" != "null"
-            echo "$INDEX,$ADDRESS,$TX_HASH" >> wallet-addresses.txt
-            echo "| $INDEX | [$ADDRESS](https://scan.botchain.ai/address/$ADDRESS) | [$TX_HASH](https://scan.botchain.ai/tx/$TX_HASH) |" >> "$GITHUB_STEP_SUMMARY"
-          done
+          echo "Quest creation: [$CREATE_TX](https://scan.botchain.ai/tx/$CREATE_TX)" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "Quest: [$QUEST_ID](https://scan.botchain.ai/address/$CONTRACT)" >> "$GITHUB_STEP_SUMMARY"
+          echo "| # | Wallet | Funding transaction | Proof transaction |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---:|---|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          for INDEX in 1 2 3 4 5 6; do
+            PHASE="generating wallet $INDEX"
+            WALLET_KEY="0x$(openssl rand -hex 32)"
+            echo "::add-mask::$WALLET_KEY"
+            ADDRESS=$(cast wallet address --private-key "$WALLET_KEY")
+
+            PHASE="funding wallet $INDEX"
+            FUND_JSON=$(cast send "$ADDRESS" --value "${FUNDING}wei" --private-key "$PRIVATE_KEY" --rpc-url "$BOTCHAIN_RPC_URL" --json)
+            FUND_TX=$(jq -r '.transactionHash // .transaction_hash // empty' <<<"$FUND_JSON")
+            test -n "$FUND_TX" || { echo "::error::Funding wallet $INDEX returned no transaction hash."; exit 1; }
+
+            PHASE="submitting proof from wallet $INDEX"
+            TX_JSON=$(cast send "$CONTRACT" 'submitProof(uint256,string)' "$QUEST_ID" "$INDEX" \
+              --gas-limit "$SUBMIT_GAS_LIMIT" --gas-price "$GAS_PRICE" --private-key "$WALLET_KEY" --rpc-url "$BOTCHAIN_RPC_URL" --json)
+            TX_HASH=$(jq -r '.transactionHash // .transaction_hash // empty' <<<"$TX_JSON")
+            test -n "$TX_HASH" || { echo "::error::Proof submission from wallet $INDEX returned no transaction hash."; exit 1; }
+            echo "$INDEX,$ADDRESS,$FUND_TX,$TX_HASH" >> wallet-addresses.txt
+            echo "Wallet $INDEX completed: $ADDRESS"
+            echo "| $INDEX | [$ADDRESS](https://scan.botchain.ai/address/$ADDRESS) | [$FUND_TX](https://scan.botchain.ai/tx/$FUND_TX) | [$TX_HASH](https://scan.botchain.ai/tx/$TX_HASH) |" >> "$GITHUB_STEP_SUMMARY"
+          done
+          PHASE="finalizing the report"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Quest ID: $QUEST_ID · Contract: [$CONTRACT](https://scan.botchain.ai/address/$CONTRACT)" >> "$GITHUB_STEP_SUMMARY"
       - name: Upload wallet addresses
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: wallet-addresses
           path: wallet-addresses.txt
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 30
