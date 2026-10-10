@@ -56,7 +56,7 @@ export default function Home() {
       if (!addresses[0]) { setEnteredApp(false); setView("discover"); setSelected(undefined); }
     };
     const handleChain = (...args: unknown[]) => {
-      if (args[0] !== "0x3c8") setNotice({ tone: "bad", text: "Switch your wallet to BOT Chain Testnet to continue." });
+      if (args[0] !== "0x2a5") setNotice({ tone: "bad", text: "Switch your wallet to BOT Chain Mainnet to continue." });
     };
     void window.ethereum.request({ method: "eth_accounts" }).then(value => handleAccounts(value)).catch(() => undefined);
     window.ethereum.on?.("accountsChanged", handleAccounts);
@@ -101,7 +101,7 @@ export default function Home() {
       await context.registerTool({
         name: "start_quest_creation", title: "Start quest creation", description: "Open the funded quest creation form for the connected wallet.",
         inputSchema: { type: "object", properties: {}, additionalProperties: false }, annotations: { readOnlyHint: false, untrustedContentHint: false },
-        execute() { if (!account) throw new Error("Connect a wallet before creating a quest."); setCreateOpen(true); return { form: "open", network: "BOT Chain Testnet" }; }
+        execute() { if (!account) throw new Error("Connect a wallet before creating a quest."); setCreateOpen(true); return { form: "open", network: "BOT Chain Mainnet" }; }
       }, { signal: lifecycle.signal });
     };
     void register().catch(() => undefined);
@@ -189,11 +189,11 @@ export default function Home() {
       </header>
       {notice && <div role="status" className={`notice ${notice.tone}`}><span>{notice.tone === "good" ? <Check /> : <Flag />}</span>{notice.text}<button onClick={() => setNotice(undefined)} aria-label="Dismiss"><X /></button></div>}
       <section id="top" className="landing-hero">
-        <div className="landing-copy"><span className="kicker">QUESTS, FUNDED ON-CHAIN</span><h1>Create the mission.<br/>Reward the work.</h1><p>QuestForge gives BOT Chain communities one place to publish funded quests, submit proof, and pay approved contributors directly from a smart contract.</p><div className="landing-actions"><Button size="lg" className="create-button" onClick={openApp}>{account ? "Open QuestForge" : "Connect wallet"}</Button><a href="#how">See how it works</a></div><small>{account ? `${shortAddress(account)} connected · Open the app when you are ready.` : "A BOT Chain Testnet wallet is required to enter the app."}</small></div>
+        <div className="landing-copy"><span className="kicker">QUESTS, FUNDED ON-CHAIN</span><h1>Create the mission.<br/>Reward the work.</h1><p>QuestForge gives BOT Chain communities one place to publish funded quests, submit proof, and pay approved contributors directly from a smart contract.</p><div className="landing-actions"><Button size="lg" className="create-button" onClick={openApp}>{account ? "Open QuestForge" : "Connect wallet"}</Button><a href="#how">See how it works</a></div><small>{account ? `${shortAddress(account)} connected · Open the app when you are ready.` : "A BOT Chain Mainnet wallet is required to enter the app."}</small></div>
         <div className="forge-emblem" aria-hidden="true"><span>QF</span><i>BOT CHAIN</i></div>
       </section>
       <section id="how" className="how-section"><div className="section-label">THE FLOW</div><div className="steps"><article><b>01</b><h2>Fund a quest</h2><p>Set the mission, proof requirements, deadline, reward, and winner slots. The full pool is locked when you publish.</p></article><article><b>02</b><h2>Submit proof</h2><p>Participants complete the work and submit a public URL or a short text record from their connected wallet.</p></article><article><b>03</b><h2>Approve and pay</h2><p>The creator reviews each submission. Approval releases the promised BOT reward to that participant.</p></article></div></section>
-      <section id="network" className="network-section"><div><span className="section-label">BUILT ON BOT CHAIN</span><h2>No off-chain reward ledger.</h2></div><p>Quest funding, submissions, approvals, payouts, cancellations, and refunds are handled by the deployed QuestForge contract on BOT Chain Testnet.</p><a href="https://scan.botchain.ai" target="_blank" rel="noreferrer">Explore BOT Chain <ExternalLink /></a></section>
+      <section id="network" className="network-section"><div><span className="section-label">BUILT ON BOT CHAIN</span><h2>No off-chain reward ledger.</h2></div><p>Quest funding, submissions, approvals, payouts, cancellations, and refunds are handled by the deployed QuestForge contract on BOT Chain Mainnet.</p><a href="https://scan.botchain.ai" target="_blank" rel="noreferrer">Explore BOT Chain <ExternalLink /></a></section>
       <SiteFooter />
     </main>;
   }
@@ -208,7 +208,7 @@ export default function Home() {
           <button className={view === "history" ? "active" : ""} onClick={() => nav("history")}>History</button>
         </nav>
         <div className="wallet-actions">
-          <span className="network-pill"><i /> BOT Testnet</span>
+          <span className="network-pill"><i /> BOT Mainnet</span>
           {account ? <><span className="address-pill"><Wallet /> {shortAddress(account)}</span><Button variant="ghost" size="icon" onClick={disconnect} aria-label="Disconnect wallet"><LogOut /></Button></> : <Button className="connect-button" onClick={connect}><Wallet /> Connect wallet</Button>}
           <Button variant="ghost" size="icon" className="mobile-menu" onClick={() => setMobileOpen(!mobileOpen)} aria-label="Open menu">{mobileOpen ? <X /> : <Menu />}</Button>
         </div>
@@ -222,7 +222,7 @@ export default function Home() {
         {view === "discover" && <>
           <div className="quest-hero">
             <div><span className="eyebrow"><ShieldCheck /> Live on BOT Chain</span><h1>Pick a mission.<br/><em>Forge your proof.</em></h1><p>Explore funded quests, ship the work, and earn BOT when your submission is approved.</p></div>
-            <div className="hero-actions"><Button className="create-button" size="lg" onClick={() => account ? setCreateOpen(true) : connect()}><Plus /> Create a quest</Button><a href="https://faucet.botchain.ai" target="_blank" rel="noreferrer">Get testnet BOT <ExternalLink /></a></div>
+            <div className="hero-actions"><Button className="create-button" size="lg" onClick={() => account ? setCreateOpen(true) : connect()}><Plus /> Create a quest</Button><a href="https://scan.botchain.ai" target="_blank" rel="noreferrer">View explorer <ExternalLink /></a></div>
           </div>
 
           <div className="stat-ribbon">
@@ -233,7 +233,7 @@ export default function Home() {
 
           <div className="board-head"><div><h2>Quest board</h2><p>Every reward below is held by the smart contract.</p></div><label className="search-box"><Search /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search quests" /></label></div>
 
-          {loading ? <div className="empty-board"><LoaderCircle className="spin"/><h3>Reading the quest board</h3></div> : !CONTRACT_ADDRESS ? <div className="empty-board contract-pending"><ShieldCheck/><h3>Contract setup is ready</h3><p>Deploy the included QuestForge contract to BOT Chain Testnet, then add its address to the frontend environment to open the live board.</p></div> : filtered.length === 0 ? <div className="empty-board"><Compass/><h3>{query ? "No quests match that search" : "The board is clear"}</h3><p>{query ? "Try a different keyword." : "Be the first to fund a mission for the community."}</p>{!query && <Button onClick={() => account ? setCreateOpen(true) : connect()}><Plus/> Create the first quest</Button>}</div> : <div className="quest-grid">{filtered.map(q => <QuestCard key={String(q.id)} quest={q} onOpen={() => openQuest(q)} />)}</div>}
+          {loading ? <div className="empty-board"><LoaderCircle className="spin"/><h3>Reading the quest board</h3></div> : !CONTRACT_ADDRESS ? <div className="empty-board contract-pending"><ShieldCheck/><h3>Contract setup is ready</h3><p>Deploy the included QuestForge contract to BOT Chain Mainnet, then add its address to the frontend environment to open the live board.</p></div> : filtered.length === 0 ? <div className="empty-board"><Compass/><h3>{query ? "No quests match that search" : "The board is clear"}</h3><p>{query ? "Try a different keyword." : "Be the first to fund a mission for the community."}</p>{!query && <Button onClick={() => account ? setCreateOpen(true) : connect()}><Plus/> Create the first quest</Button>}</div> : <div className="quest-grid">{filtered.map(q => <QuestCard key={String(q.id)} quest={q} onOpen={() => openQuest(q)} />)}</div>}
         </>}
 
         {view === "dashboard" && <Dashboard account={account} quests={mine} submitted={submitted} paidCount={completed.length} onCreate={() => setCreateOpen(true)} onOpen={openQuest} />}

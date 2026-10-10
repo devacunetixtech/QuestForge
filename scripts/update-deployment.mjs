@@ -8,9 +8,9 @@ if (!/^0x[a-fA-F0-9]{40}$/.test(address ?? "")) {
 const target = new URL("../lib/deployment.ts", import.meta.url);
 const current = await readFile(target, "utf8");
 const next = current.replace(
-  /export const QUESTFORGE_TESTNET_ADDRESS = .*;/,
-  `export const QUESTFORGE_TESTNET_ADDRESS = "${address}" as const;`,
+  /export const QUESTFORGE_MAINNET_ADDRESS.*;/,
+  `export const QUESTFORGE_MAINNET_ADDRESS = "${address}" as const;`,
 );
 
-if (current === next) throw new Error("Could not update the deployment address.");
+if (current === next) throw new Error("Could not update the mainnet deployment address.");
 await writeFile(target, next);

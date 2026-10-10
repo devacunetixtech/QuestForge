@@ -1,16 +1,16 @@
 import { createPublicClient, createWalletClient, custom, defineChain, formatEther, http, parseEther } from "viem";
-import { QUESTFORGE_TESTNET_ADDRESS } from "./deployment";
+import { QUESTFORGE_MAINNET_ADDRESS } from "./deployment";
 
-export const botchainTestnet = defineChain({
-  id: 968,
-  name: "BOT Chain Testnet",
+export const botchainMainnet = defineChain({
+  id: 677,
+  name: "BOT Chain Mainnet",
   nativeCurrency: { name: "BOT", symbol: "BOT", decimals: 18 },
-  rpcUrls: { default: { http: ["https://rpc.bohr.life"] } },
-  blockExplorers: { default: { name: "BOT Chain Testnet Explorer", url: "https://scan.bohr.life" } },
+  rpcUrls: { default: { http: ["https://rpc.botchain.ai"] } },
+  blockExplorers: { default: { name: "BOT Chain Mainnet Explorer", url: "https://scan.botchain.ai" } },
 });
 
 const configuredAddress = process.env.NEXT_PUBLIC_QUESTFORGE_ADDRESS as `0x${string}` | undefined;
-export const CONTRACT_ADDRESS = configuredAddress || QUESTFORGE_TESTNET_ADDRESS;
+export const CONTRACT_ADDRESS = configuredAddress || QUESTFORGE_MAINNET_ADDRESS;
 
 export const questForgeAbi = [
   { type: "event", name: "QuestCreated", inputs: [{ indexed: true, name: "questId", type: "uint256" }, { indexed: true, name: "creator", type: "address" }, { indexed: false, name: "rewardPerWinner", type: "uint256" }, { indexed: false, name: "maxWinners", type: "uint256" }, { indexed: false, name: "deadline", type: "uint256" }] },
@@ -27,27 +27,27 @@ export const questForgeAbi = [
 
 export type Quest = { id: bigint; creator: `0x${string}`; title: string; description: string; requirements: string; deadline: number; reward: bigint; maxWinners: number; winners: number; cancelled: boolean };
 
-export const publicClient = createPublicClient({ chain: botchainTestnet, transport: http() });
+export const publicClient = createPublicClient({ chain: botchainMainnet, transport: http() });
 
 export function getWalletClient(account: `0x${string}`) {
   if (!window.ethereum) throw new Error("Install an EVM wallet to continue.");
-  return createWalletClient({ account, chain: botchainTestnet, transport: custom(window.ethereum) });
+  return createWalletClient({ account, chain: botchainMainnet, transport: custom(window.ethereum) });
 }
 
 export async function ensureBotchain() {
   if (!window.ethereum) throw new Error("Install an EVM wallet to continue.");
   try {
-    await window.ethereum.request({ method: "wallet_switchEthereumChain", params: [{ chainId: "0x3c8" }] });
+    await window.ethereum.request({ method: "wallet_switchEthereumChain", params: [{ chainId: "0x2a5" }] });
   } catch (error) {
-    if ((error as { code?: number }).code !== 4902) throw new Error("Switch your wallet to BOT Chain Testnet to continue.");
-    await window.ethereum.request({ method: "wallet_addEthereumChain", params: [{ chainId: "0x3c8", chainName: "BOT Chain Testnet", nativeCurrency: { name: "BOT", symbol: "BOT", decimals: 18 }, rpcUrls: ["https://rpc.bohr.life"], blockExplorerUrls: ["https://scan.bohr.life"] }] });
+    if ((error as { code?: number }).code !== 4902) throw new Error("Switch your wallet to BOT Chain Mainnet to continue.");
+    await window.ethereum.request({ method: "wallet_addEthereumChain", params: [{ chainId: "0x2a5", chainName: "BOT Chain Mainnet", nativeCurrency: { name: "BOT", symbol: "BOT", decimals: 18 }, rpcUrls: ["https://rpc.botchain.ai"], blockExplorerUrls: ["https://scan.botchain.ai"] }] });
   }
 }
 
 export function userError(error: unknown) {
   const message = error instanceof Error ? error.message : "The transaction could not be completed.";
   if (/Install an EVM wallet/i.test(message)) return "Install or open an EVM wallet such as Bitget Wallet or TokenPocket to continue.";
-  if (/Switch your wallet/i.test(message)) return "Switch your wallet to BOT Chain Testnet and try again.";
+  if (/Switch your wallet/i.test(message)) return "Switch your wallet to BOT Chain Mainnet and try again.";
   if (/rejected|denied/i.test(message)) return "You cancelled the request in your wallet.";
   if (/insufficient funds/i.test(message)) return "Your wallet does not have enough BOT for this transaction.";
   if (/InvalidDeadline/i.test(message)) return "Choose a deadline that is still in the future.";
