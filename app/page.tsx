@@ -39,8 +39,8 @@ export default function Home() {
   const loadQuests = useCallback(async () => {
     if (!CONTRACT_ADDRESS) { setLoading(false); return; }
     try {
-      const count = await publicClient.readContract({ address: CONTRACT_ADDRESS, abi: questForgeAbi, functionName: "questCount" });
-      const rows = await Promise.all(Array.from({ length: Number(count) }, (_, index) => publicClient.readContract({ address: CONTRACT_ADDRESS, abi: questForgeAbi, functionName: "getQuest", args: [BigInt(index + 1)] })));
+      const count = await publicClient.readContract({ address: CONTRACT_ADDRESS!, abi: questForgeAbi, functionName: "questCount" });
+      const rows = await Promise.all(Array.from({ length: Number(count) }, (_, index) => publicClient.readContract({ address: CONTRACT_ADDRESS!, abi: questForgeAbi, functionName: "getQuest", args: [BigInt(index + 1)] })));
       setQuests(rows.map((r, index) => ({ id: BigInt(index + 1), creator: r[0], title: r[1], description: r[2], requirements: r[3], deadline: Number(r[4]), reward: r[5], maxWinners: Number(r[6]), winners: Number(r[7]), cancelled: r[8] })).reverse());
     } catch (error) { setNotice({ tone: "bad", text: userError(error) }); }
     finally { setLoading(false); }
@@ -72,10 +72,10 @@ export default function Home() {
     let active = true;
     const loadActivity = async () => {
       try {
-        const logs = await publicClient.getContractEvents({ address: CONTRACT_ADDRESS, abi: questForgeAbi, eventName: "ProofSubmitted", args: { participant: account }, fromBlock: 0n });
+        const logs = await publicClient.getContractEvents({ address: CONTRACT_ADDRESS!, abi: questForgeAbi, eventName: "ProofSubmitted", args: { participant: account }, fromBlock: 0n });
         const ids = [...new Set(logs.map(log => log.args.questId).filter((id): id is bigint => typeof id === "bigint"))];
         const rows = await Promise.all(ids.map(async questId => {
-          const result = await publicClient.readContract({ address: CONTRACT_ADDRESS, abi: questForgeAbi, functionName: "getSubmission", args: [questId, account] });
+          const result = await publicClient.readContract({ address: CONTRACT_ADDRESS!, abi: questForgeAbi, functionName: "getSubmission", args: [questId, account] });
           return { questId, approved: result[2] };
         }));
         if (active) setParticipations(rows);
@@ -134,13 +134,13 @@ export default function Home() {
     const reward = parseEther(String(form.get("reward")));
     const winners = Number(form.get("winners"));
     const deadline = Math.floor(new Date(String(form.get("deadline"))).getTime() / 1000);
-    await runTransaction(async () => getWalletClient(account).writeContract({ address: CONTRACT_ADDRESS, abi: questForgeAbi, functionName: "createQuest", args: [String(form.get("title")), String(form.get("description")), String(form.get("requirements")), BigInt(deadline), reward, winners], value: reward * BigInt(winners) }), "Quest funded and published on BOT Chain.");
+    await runTransaction(async () => getWalletClient(account).writeContract({ address: CONTRACT_ADDRESS!, abi: questForgeAbi, functionName: "createQuest", args: [String(form.get("title")), String(form.get("description")), String(form.get("requirements")), BigInt(deadline), reward, winners], value: reward * BigInt(winners) }), "Quest funded and published on BOT Chain.");
     setCreateOpen(false);
   }
 
   async function submitProof(form: FormData) {
     if (!account || !selected || !CONTRACT_ADDRESS) return;
-    await runTransaction(async () => getWalletClient(account).writeContract({ address: CONTRACT_ADDRESS, abi: questForgeAbi, functionName: "submitProof", args: [selected.id, String(form.get("proof"))] }), "Proof submitted. The creator can now review it.");
+    await runTransaction(async () => getWalletClient(account).writeContract({ address: CONTRACT_ADDRESS!, abi: questForgeAbi, functionName: "submitProof", args: [selected.id, String(form.get("proof"))] }), "Proof submitted. The creator can now review it.");
     setSelected(undefined);
   }
 
@@ -148,10 +148,10 @@ export default function Home() {
     setSelected(quest); setSubmissions([]);
     if (!CONTRACT_ADDRESS || !account || account.toLowerCase() !== quest.creator.toLowerCase()) return;
     try {
-      const logs = await publicClient.getContractEvents({ address: CONTRACT_ADDRESS, abi: questForgeAbi, eventName: "ProofSubmitted", args: { questId: quest.id }, fromBlock: 0n });
+      const logs = await publicClient.getContractEvents({ address: CONTRACT_ADDRESS!, abi: questForgeAbi, eventName: "ProofSubmitted", args: { questId: quest.id }, fromBlock: 0n });
       const rows = await Promise.all(logs.map(async log => {
         const participant = log.args.participant!;
-        const details = await publicClient.readContract({ address: CONTRACT_ADDRESS, abi: questForgeAbi, functionName: "getSubmission", args: [quest.id, participant] });
+        const details = await publicClient.readContract({ address: CONTRACT_ADDRESS!, abi: questForgeAbi, functionName: "getSubmission", args: [quest.id, participant] });
         return { participant, proof: details[0], approved: details[2] };
       }));
       setSubmissions(rows);
@@ -160,7 +160,7 @@ export default function Home() {
 
   async function approve(participant: `0x${string}`) {
     if (!account || !selected || !CONTRACT_ADDRESS) return;
-    await runTransaction(async () => getWalletClient(account).writeContract({ address: CONTRACT_ADDRESS, abi: questForgeAbi, functionName: "approveSubmission", args: [selected.id, participant] }), "Submission approved and BOT reward released.");
+    await runTransaction(async () => getWalletClient(account).writeContract({ address: CONTRACT_ADDRESS!, abi: questForgeAbi, functionName: "approveSubmission", args: [selected.id, participant] }), "Submission approved and BOT reward released.");
     setSelected(undefined);
   }
 
