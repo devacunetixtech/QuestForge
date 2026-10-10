@@ -43,19 +43,25 @@ jobs:
           echo "Gas price: $GAS_PRICE wei"
           echo "Funding each temporary wallet with $FUNDING wei; unused gas remains in that wallet."
 
-          PHASE="creating the minimal six-slot quest"
-          DEADLINE=$(($(date +%s) + 604800))
-          CREATE_JSON=$(cast send "$CONTRACT" 'createQuest(string,string,string,uint64,uint96,uint32)' Q Q Q "$DEADLINE" 1 6 \
-            --value 6wei --private-key "$PRIVATE_KEY" --rpc-url "$BOTCHAIN_RPC_URL" --json)
-          CREATE_TX=$(jq -r '.transactionHash // .transaction_hash // empty' <<<"$CREATE_JSON")
-          test -n "$CREATE_TX" || { echo "::error::The quest transaction returned no transaction hash."; exit 1; }
+          PHASE="selecting the minimal six-slot quest"
           QUEST_ID=$(cast call "$CONTRACT" 'questCount()(uint256)' --rpc-url "$BOTCHAIN_RPC_URL")
-          echo "Quest $QUEST_ID created: https://scan.botchain.ai/tx/$CREATE_TX"
+          if [ "$QUEST_ID" = "0" ]; then
+            DEADLINE=$(($(date +%s) + 604800))
+            CREATE_JSON=$(cast send "$CONTRACT" 'createQuest(string,string,string,uint64,uint96,uint32)' Q Q Q "$DEADLINE" 1 6 \
+              --value 6wei --private-key "$PRIVATE_KEY" --rpc-url "$BOTCHAIN_RPC_URL" --json)
+            CREATE_TX=$(jq -r '.transactionHash // .transaction_hash // empty' <<<"$CREATE_JSON")
+            test -n "$CREATE_TX" || { echo "::error::The quest transaction returned no transaction hash."; exit 1; }
+            QUEST_ID=$(cast call "$CONTRACT" 'questCount()(uint256)' --rpc-url "$BOTCHAIN_RPC_URL")
+            QUEST_NOTE="Created quest $QUEST_ID: https://scan.botchain.ai/tx/$CREATE_TX"
+          else
+            QUEST_NOTE="Reusing existing minimal quest $QUEST_ID to avoid another quest-creation gas fee."
+          fi
+          echo "$QUEST_NOTE"
 
           : > wallet-addresses.txt
           echo "### Six BOT Chain Mainnet wallet interactions" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "Quest creation: [$CREATE_TX](https://scan.botchain.ai/tx/$CREATE_TX)" >> "$GITHUB_STEP_SUMMARY"
+          echo "$QUEST_NOTE" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "| # | Wallet | Funding transaction | Proof transaction |" >> "$GITHUB_STEP_SUMMARY"
           echo "|---:|---|---|---|" >> "$GITHUB_STEP_SUMMARY"
